@@ -47,8 +47,9 @@ export class Cache {
         }
 
         if (isBlobImage(src) || isRenderable(src)) {
-            (this._cache[src] = this.loadImage(src)).catch(() => {
+            (this._cache[src] = this.loadImage(src)).catch((reason) => {
                 // prevent unhandled rejection
+                this.context.logger.debug(src, "addImage() error", reason);
             });
             return result;
         }
@@ -62,6 +63,7 @@ export class Cache {
     }
 
     private async loadImage(key: string) {
+        this.context.logger.debug("loadImage() for key", key);
         const isSameOrigin = CacheStorage.isSameOrigin(key);
         const useCORS =
             !isInlineImage(key) && this._options.useCORS === true && FEATURES.SUPPORT_CORS_IMAGES && !isSameOrigin;
@@ -72,6 +74,15 @@ export class Cache {
             typeof this._options.proxy === 'string' &&
             FEATURES.SUPPORT_CORS_XHR &&
             !useCORS;
+        
+        this.context.logger.debug("loadImage() params:", {
+            key,
+            isSameOrigin,
+            useCORS,
+            useProxy,
+            allowTaint: this._options.allowTaint,
+        });
+
         if (
             !isSameOrigin &&
             this._options.allowTaint === false &&
@@ -80,6 +91,7 @@ export class Cache {
             !useProxy &&
             !useCORS
         ) {
+            this.context.logger.debug(key, "early return from loadImage()");
             return;
         }
 
@@ -102,6 +114,8 @@ export class Cache {
                     img.crossOrigin = 'anonymous';
                 }
             }
+            this.context.logger.debug(key, {crossOrigin: img.crossOrigin});
+
             img.src = src;
             if (img.complete === true) {
                 // Inline XML images may fail to parse, throwing an Error later on
